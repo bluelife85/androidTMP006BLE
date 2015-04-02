@@ -6,8 +6,10 @@
     <string name="action_settings">Settings</string>
 	<string name="scan_button">Bluetooth Le Scan</string>
 	<string name="vobj_text_view">VOBJ 값</string>
-	<string name="defualt_value">0000</string>
+	<string name="defualt_value">0x0000</string>
 	<string name="tamb_text_view">TAMB 값</string>
 	<string name="measure_text_view">측정 온도</string>
 	<string name="default_measured_temperature">000.00000</string>
+	<string name="get_measure_value">온도 측정 시작</string>
+	<string name="scan_cancel">검색 취소</string>
 </resources>
