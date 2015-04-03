@@ -25,6 +25,10 @@ private static final String TAG = "BluetoothLeService";
 	private static final int STATE_CONNECTING = 1;
 	private static final int STATE_CONNECTED = 2;
 	
+	private static final String UUID_POWER_ENABLER = "000084a1-0000-1000-8000-00805f9b34fb";
+	private static final String UUID_VOBJ_READ = "000084a2-0000-1000-8000-00805f9b34fb";
+	private static final String UUID_TAMB_READ = "000084a3-0000-1000-8000-00805f9b34fb";
+	
 	public final static String ACTION_GATT_CONNECTED = "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
 	public final static String ACTION_GATT_DISCONNECTED = "com.example.bluetooth.le.ACTION_GATT_DISCONNECTED";
 	public final static String ACTION_GATT_SERVICES_DISCOVERED = "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED";
@@ -98,9 +102,27 @@ private static final String TAG = "BluetoothLeService";
 			final Intent intent = new Intent(action);
 			// For all other profiles, writes the data formatted in HEX.
 			final byte[] data = characteristic.getValue();
+			final String UUID = characteristic.getUuid().toString();
 			
-			short short_data = (short) (data[1] << 8 | data[0]);
-			intent.putExtra(ACTION_DATA_AVAILABLE, short_data);
+			if(UUID.equals(UUID_POWER_ENABLER)){
+				boolean state = false;
+				
+				if(data[0] == 0){
+					state = false;
+				}
+				else{
+					state = true;
+				}
+				
+				intent.putExtra(ACTION_DATA_AVAILABLE, state);
+				intent.putExtra(ACTION_DATA_AVAILABLE, UUID);
+			}
+			else{
+				short short_data = (short) (data[1] << 8 | data[0]);
+				intent.putExtra(ACTION_DATA_AVAILABLE, short_data);
+				intent.putExtra(ACTION_DATA_AVAILABLE, UUID);
+			}
+			
 			sendBroadcast(intent);
 		}
 
