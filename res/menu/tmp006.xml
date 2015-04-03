@@ -12,7 +12,15 @@
         android:id="@+id/action_measurement"
         android:orderInCategory="100"
         android:showAsAction="never"
-        android:title="@string/action_measure_start">
+        android:title="@string/action_measure_start"
+        android:visible="false">
     </item>
 
+    <item
+        android:id="@+id/action_power_state"
+        android:orderInCategory="100"
+        android:showAsAction="never"
+        android:title="@string/action_state_unknown"
+        android:visible="false">
+    </item>
 </menu>
