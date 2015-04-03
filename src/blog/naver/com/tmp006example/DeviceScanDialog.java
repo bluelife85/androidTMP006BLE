@@ -128,7 +128,7 @@ public class DeviceScanDialog extends Dialog implements OnClickListener{
 		
 		public void addDevice(BluetoothDevice device){
 			
-			if(mLeDevices.contains(device)){
+			if(!mLeDevices.contains(device)){
 				mLeDevices.add(device);
 			}
 		}

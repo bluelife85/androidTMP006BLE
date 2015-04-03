@@ -100,29 +100,10 @@ private static final String TAG = "BluetoothLeService";
 
 		private void broadcastUpdate(final String action, final BluetoothGattCharacteristic characteristic) {
 			final Intent intent = new Intent(action);
-			// For all other profiles, writes the data formatted in HEX.
-			final byte[] data = characteristic.getValue();
-			final String UUID = characteristic.getUuid().toString();
 			
-			if(UUID.equals(UUID_POWER_ENABLER)){
-				boolean state = false;
-				
-				if(data[0] == 0){
-					state = false;
-				}
-				else{
-					state = true;
-				}
-				
-				intent.putExtra(ACTION_DATA_AVAILABLE, state);
-				intent.putExtra(ACTION_DATA_AVAILABLE, UUID);
-			}
-			else{
-				short short_data = (short) (data[1] << 8 | data[0]);
-				intent.putExtra(ACTION_DATA_AVAILABLE, short_data);
-				intent.putExtra(ACTION_DATA_AVAILABLE, UUID);
-			}
+			SensorValueParcelableData data = new SensorValueParcelableData(characteristic.getUuid().toString(), characteristic.getValue());
 			
+			intent.putExtra(ACTION_DATA_AVAILABLE, data);
 			sendBroadcast(intent);
 		}
 
@@ -207,7 +188,7 @@ private static final String TAG = "BluetoothLeService";
 					return false;
 				}
 			}
-
+			
 			final BluetoothDevice device = mBluetoothAdapter
 					.getRemoteDevice(address);
 			if (device == null) {

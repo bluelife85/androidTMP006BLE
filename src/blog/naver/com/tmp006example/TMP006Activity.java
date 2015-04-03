@@ -34,15 +34,12 @@ public class TMP006Activity extends Activity {
 	
 	private static final int REQUEST_ENABLE_BT = 1;
 	private static final String ADDRESS_DATA = "Address";
-	private static final String READ_VOBJ_DATA = "VOBJ";
-	private static final String READ_TAMB_DATA = "TAMB";
 	
 	private static final int HANDLER_CONNECT_ADDRESS = 1;
 	private static final int HANDLER_READ_VOBJ_DATA = 2;
 	private static final int HANDLER_READ_TAMB_DATA = 3;
 	private static final int HANDLER_ASK_VOBJ = 4;
 	private static final int HANDLER_ASK_TAMB = 5;
-	private static final int HANDLER_ASK_POWER_STATE = 6;
 	
 	private static final int POWER_OFF = 0;
 	private static final int POWER_ON = 1;
@@ -51,6 +48,15 @@ public class TMP006Activity extends Activity {
 	private static final int INDEX_SCAN = 0;
 	private static final int INDEX_MEASUREMENT = 1;
 	private static final int INDEX_POWER_STATE = 2;
+	
+	private static final double TMP006_B0 = -0.0000294;
+	private static final double TMP006_B1 = -0.00000057;
+	private static final double TMP006_B2 = 0.00000000463;
+	private static final double TMP006_C2 = 13.4;
+	private static final double TMP006_TREF = 298.15;
+	private static final double TMP006_A2 = -0.00001678;
+	private static final double TMP006_A1 = 0.00175;
+	private static final double TMP006_S0 = 6.4;
 	
 	private TextView mTextVOBJ;
 	private TextView mTextTAMB;
@@ -63,8 +69,41 @@ public class TMP006Activity extends Activity {
 	private String mDeviceAddress;
 	
 	private int PowerState = UNKNOWN_STATE;
+	private boolean connected = false;
+	private boolean askFlag = false;
+	
+	private short valueTamb;
+	private short valueVOBJ;
+	
 	private Menu mMenu;
 	
+	private double calculateTemperature(){
+		double Tdie = valueTamb * 0.03125;
+		Tdie += 273.15; // T Die temperature
+		
+		double Vobj = valueVOBJ * 156.25;
+		Vobj /= 1000;
+		Vobj /= 1000;
+		Vobj /= 1000; // nV -> V
+		
+		double tdie_tref = Tdie - TMP006_TREF;
+		double S = (1 + TMP006_A1*tdie_tref + 
+                TMP006_A2*tdie_tref*tdie_tref);
+		S *= TMP006_S0;
+		S /= 10000000;
+		S /= 10000000;
+
+		double Vos = TMP006_B0 + TMP006_B1*tdie_tref + 
+           TMP006_B2*tdie_tref*tdie_tref;
+
+		double fVobj = (Vobj - Vos) + TMP006_C2*(Vobj-Vos)*(Vobj-Vos);
+
+		double Tobj = Math.sqrt(Math.sqrt(Tdie * Tdie * Tdie * Tdie + fVobj/S));
+
+		Tobj -= 273.15; // Kelvin -> *C
+		
+		return Tobj;
+	}
 	private Handler mHandler = new Handler(){
 		
 		@Override
@@ -76,8 +115,10 @@ public class TMP006Activity extends Activity {
 				Bundle address_bundle = msg.getData();
 				mDeviceAddress = address_bundle.getString(ADDRESS_DATA);
 				
+				Log.d(TAG, "Address : " + mDeviceAddress);
+				
 				if( mDeviceAddress != null ){
-					if(mBluetoothLeService.connect(ADDRESS_DATA)){
+					if(mBluetoothLeService.connect(mDeviceAddress)){
 						Toast.makeText(getApplication(), "connecting : " + mDeviceAddress, Toast.LENGTH_SHORT).show();
 					}
 					else{
@@ -86,14 +127,16 @@ public class TMP006Activity extends Activity {
 				}
 				break;
 			case HANDLER_READ_VOBJ_DATA:
+				mGattCharacteristic = mBluetoothLeService.getSupportedGattServices().get(2).getCharacteristics().get(1);
+				mBluetoothLeService.readCharacteristic(mGattCharacteristic);
 				break;
 			case HANDLER_READ_TAMB_DATA:
+				mGattCharacteristic = mBluetoothLeService.getSupportedGattServices().get(2).getCharacteristics().get(2);
+				mBluetoothLeService.readCharacteristic(mGattCharacteristic);
 				break;
 			case HANDLER_ASK_TAMB:
 				break;
 			case HANDLER_ASK_VOBJ:
-				break;
-			case HANDLER_ASK_POWER_STATE:
 				break;
 			default:
 				break;
@@ -150,18 +193,55 @@ public class TMP006Activity extends Activity {
 	public boolean onOptionsItemSelected(MenuItem item) {
 		int id = item.getItemId();
 		if (id == R.id.action_scan) {
-			DeviceScanDialog dialog = getNewScanDialog();
 			
-			dialog.show();
-			
+			if(!connected){
+				DeviceScanDialog dialog = getNewScanDialog();
+				dialog.show();
+			}
+			else{
+				mBluetoothLeService.disconnect();
+			}
 			return true;
 		}
 		else if (id == R.id.action_measurement){
-			Toast.makeText(getApplication(), "measure", Toast.LENGTH_SHORT).show();
+			if ( askFlag ){
+				item.setTitle("측정 시작");
+				Toast.makeText(getApplication(), "측정 종료", Toast.LENGTH_SHORT).show();
+				askFlag = false;
+				mHandler.removeMessages(HANDLER_READ_VOBJ_DATA);
+				mHandler.removeMessages(HANDLER_READ_TAMB_DATA);
+			}
+			else{
+				item.setTitle("측정 종료");
+				Toast.makeText(getApplication(), "측정 시작", Toast.LENGTH_LONG).show();
+				mGattCharacteristic = mBluetoothLeService.getSupportedGattServices().get(2).getCharacteristics().get(1);
+
+				mHandler.sendEmptyMessage(HANDLER_READ_VOBJ_DATA);
+				askFlag = true;
+			}
 			return true;
 		}
 		else if( id == R.id.action_power_state){
-			Toast.makeText(getApplication(), "power_state", Toast.LENGTH_SHORT).show();
+			
+			mGattCharacteristic = mBluetoothLeService.getSupportedGattServices().get(2).getCharacteristics().get(0);
+			
+			if(PowerState == POWER_OFF){
+				mBluetoothLeService.writeCharacteristic(mGattCharacteristic, (byte)0x01);
+				
+				PowerState = POWER_ON;
+				
+				item.setTitle(R.string.action_state_power_on);
+			}
+			else if (PowerState == POWER_ON){
+				mBluetoothLeService.writeCharacteristic(mGattCharacteristic, (byte)0x00);
+				
+				PowerState = POWER_OFF;
+				
+				item.setTitle(R.string.action_state_power_off);
+			}
+			else{
+				mBluetoothLeService.readCharacteristic(mGattCharacteristic);
+			}
 			return true;
 		}
 		return super.onOptionsItemSelected(item);
@@ -200,22 +280,23 @@ public class TMP006Activity extends Activity {
 			final String action = intent.getAction();
 			
 			if(BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)){
-				MenuItem item = mMenu.getItem(INDEX_SCAN);
 				
-				item.setTitle(R.string.action_disconnect);
+				connected = true;
 				
-				item = mMenu.getItem(INDEX_MEASUREMENT);
-				item.setVisible(true);
-				item = mMenu.getItem(INDEX_POWER_STATE);
+				MenuItem item = mMenu.getItem(INDEX_POWER_STATE);
 				item.setTitle(R.string.action_state_unknown);
 				item.setVisible(true);
+				
+				Toast.makeText(getApplication(), "connected", Toast.LENGTH_SHORT).show();
 			}
 			else if(BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)){
 				PowerState = UNKNOWN_STATE;
-				
+				connected = false;
+				askFlag = false;
 				MenuItem item = mMenu.getItem(INDEX_SCAN);
 				item.setTitle(R.string.action_scanning);
 				item = mMenu.getItem(INDEX_MEASUREMENT);
+				item.setTitle("측정 시작");
 				item.setVisible(false);
 				item = mMenu.getItem(INDEX_POWER_STATE);
 				item.setVisible(false);
@@ -226,36 +307,48 @@ public class TMP006Activity extends Activity {
 			else if(BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)){
 				
 				Bundle b = intent.getExtras();
-				String uuid = b.getString(BluetoothLeService.ACTION_DATA_AVAILABLE);
+				SensorValueParcelableData data = b.getParcelable(BluetoothLeService.ACTION_DATA_AVAILABLE);
+				byte[] origin_value = data.value;
 				
-				if(uuid != null){
-					if(uuid.equals(UUID_POWER_ENABLER)){
+				if(data.UUID.equals(UUID_POWER_ENABLER)){
+					MenuItem item = mMenu.getItem(INDEX_POWER_STATE);
+					
+					if(origin_value[0] == (byte)0x00){
+						PowerState = POWER_OFF;
+						Toast.makeText(getApplication(), "sensor power disabled", Toast.LENGTH_SHORT).show();
 						
-						boolean power_state = b.getBoolean(BluetoothLeService.ACTION_DATA_AVAILABLE);
-						MenuItem item = mMenu.getItem(INDEX_POWER_STATE);
-						if(power_state){
-							item.setTitle(R.string.action_state_power_on);
-						}
-						else{
-							item.setTitle(R.string.action_state_power_off);
-						}
-					}
-					else if(uuid.equals(UUID_TAMB_READ)){
-						short tamb = b.getShort(BluetoothLeService.ACTION_DATA_AVAILABLE);
-						
-						mTextTAMB.setText(Integer.toHexString(tamb & 0xffff));
-					}
-					else if(uuid.equals(UUID_VOBJ_READ)){
-						short vobj = b.getShort(BluetoothLeService.ACTION_DATA_AVAILABLE);
-						
-						mTextVOBJ.setText(Integer.toHexString(vobj & 0xffff));
+						item.setTitle(R.string.action_state_power_off);
+						item.setVisible(false);
+						item.setVisible(true);
 					}
 					else{
-						Log.w(TAG, "unknown uuid : " + uuid);
+						PowerState = POWER_ON;
+						Toast.makeText(getApplication(), "sensor power enabled", Toast.LENGTH_SHORT).show();
+						item.setTitle(R.string.action_state_power_on);
+						item.setVisible(false);
+						item.setVisible(true);
 					}
+					
+					item = mMenu.getItem(INDEX_MEASUREMENT);
+					item.setVisible(true);
+					Log.d(TAG, "RECEIVED POWER STATE");
 				}
-				else{
-					Log.e(TAG, "UUID is null");
+				else if(data.UUID.equals(UUID_TAMB_READ)){
+					
+					valueTamb = (short) ((((short)origin_value[1] << 8) & 0xff00) | ((short)origin_value[0] & 0x00ff));
+					
+					mTextTAMB.setText(Integer.toHexString((int)(valueTamb & 0xffff)));
+					mHandler.sendEmptyMessageDelayed(HANDLER_READ_VOBJ_DATA, 1000);
+				}
+				else if(data.UUID.equals(UUID_VOBJ_READ)){
+					valueVOBJ = (short) ((((short)origin_value[1] << 8) & 0xff00) | ((short)origin_value[0] & 0x00ff));
+					
+					mTextVOBJ.setText(Integer.toHexString((int)(valueVOBJ & 0xffff)));
+					
+					double temp_data = calculateTemperature();
+					
+					mTextTemperature.setText(String.valueOf(temp_data));
+					mHandler.sendEmptyMessageDelayed(HANDLER_READ_TAMB_DATA, 1000);
 				}
 			}
 		}
@@ -323,27 +416,6 @@ public class TMP006Activity extends Activity {
 			return true;
 		}
 		return super.onKeyDown(keyCode, event);
-	}
-	
-	private void sendMessage(int message_type){
-		
-		Bundle b = new Bundle();
-		Message msg = new Message();
-		
-		msg.what = message_type;
-		
-		switch(message_type){
-		case HANDLER_READ_TAMB_DATA:
-			break;
-		case HANDLER_READ_VOBJ_DATA:
-			break;
-		case HANDLER_ASK_TAMB:
-			break;
-		case HANDLER_ASK_VOBJ:
-			break;
-		case HANDLER_ASK_POWER_STATE:
-			break;
-		}
 	}
 	
 	private static IntentFilter makeGattupdateIntentFilter(){
