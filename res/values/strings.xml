@@ -4,6 +4,10 @@
     <string name="app_name">TMP006Example</string>
     <string name="hello_world">Hello world!</string>
     <string name="action_scanning">Bluetooth Le Scan</string>
+    <string name="action_disconnect">Disconnect</string>
+    <string name="action_state_power_off">센서 꺼져있음</string>
+    <string name="action_state_power_on">센서 켜져있음</string>
+    <string name="action_state_unknown">알 수 없음</string>
 	<string name="scan_button">Bluetooth Le Scan</string>
 	<string name="vobj_text_view">VOBJ 값</string>
 	<string name="defualt_value">0x0000</string>

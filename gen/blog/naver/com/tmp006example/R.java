@@ -26,6 +26,7 @@ public final class R {
     }
     public static final class id {
         public static final int action_measurement=0x7f08000c;
+        public static final int action_power_state=0x7f08000d;
         public static final int action_scan=0x7f08000b;
         public static final int btn_scan_cancel=0x7f080009;
         public static final int deviceList=0x7f08000a;
@@ -48,18 +49,22 @@ public final class R {
         public static final int tmp006=0x7f070000;
     }
     public static final class string {
-        public static final int action_measure_start=0x7f05000b;
+        public static final int action_disconnect=0x7f050003;
+        public static final int action_measure_start=0x7f05000f;
         public static final int action_scanning=0x7f050002;
+        public static final int action_state_power_off=0x7f050004;
+        public static final int action_state_power_on=0x7f050005;
+        public static final int action_state_unknown=0x7f050006;
         public static final int app_name=0x7f050000;
-        public static final int default_measured_temperature=0x7f050008;
-        public static final int defualt_value=0x7f050005;
-        public static final int get_measure_value=0x7f050009;
+        public static final int default_measured_temperature=0x7f05000c;
+        public static final int defualt_value=0x7f050009;
+        public static final int get_measure_value=0x7f05000d;
         public static final int hello_world=0x7f050001;
-        public static final int measure_text_view=0x7f050007;
-        public static final int scan_button=0x7f050003;
-        public static final int scan_cancel=0x7f05000a;
-        public static final int tamb_text_view=0x7f050006;
-        public static final int vobj_text_view=0x7f050004;
+        public static final int measure_text_view=0x7f05000b;
+        public static final int scan_button=0x7f050007;
+        public static final int scan_cancel=0x7f05000e;
+        public static final int tamb_text_view=0x7f05000a;
+        public static final int vobj_text_view=0x7f050008;
     }
     public static final class style {
         /** 
