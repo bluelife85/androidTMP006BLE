@@ -1,19 +1,24 @@
 package blog.naver.com.tmp006example;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.TextView;
@@ -100,7 +105,30 @@ public class TMP006Activity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_tmp006);
 		
+		if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)){
+			Toast.makeText(getApplication(), "Bluetooth LE is not supported", Toast.LENGTH_SHORT).show();
+			finish();
+		}
+		
+		final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+		mBluetoothAdapter = bluetoothManager.getAdapter();
+		
+		if(mBluetoothAdapter == null){
+			Toast.makeText(this, "Bluetooth is not supported", Toast.LENGTH_SHORT).show();
+			finish();
+		}
+		
 		setup();
+		
+		Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
+		
+		if(startService(gattServiceIntent) != null){
+			bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
+			
+		}
+		else{
+			Log.w(TAG, "bind service is null");
+		}
 	}
 
 	private void setup(){
@@ -157,8 +185,8 @@ public class TMP006Activity extends Activity {
 		public void onServiceConnected(ComponentName name, IBinder service) {
 			mBluetoothLeService = ((BluetoothLeService.LocalBinder) service).getService();
 			
-			if(mBluetoothLeService.initialize()){
-				Log.e(TAG, "unable to initialize BluetootLE service");
+			if(!mBluetoothLeService.initialize()){
+				Log.e(TAG, "unable to initialize Bluetoot LE service");
 				finish();
 			}
 		}
@@ -232,6 +260,70 @@ public class TMP006Activity extends Activity {
 			}
 		}
 	};
+	
+	@Override
+	protected void onResume() {
+		super.onResume();
+		
+		if( !mBluetoothAdapter.isEnabled()){
+			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+			startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+		}
+		
+		registerReceiver(mGattUpdateReceiver, makeGattupdateIntentFilter());
+	};
+	
+	@Override
+	protected void onPause() {
+		super.onPause();
+		unregisterReceiver(mGattUpdateReceiver);
+	}
+	
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		
+		if( requestCode == REQUEST_ENABLE_BT && resultCode == Activity.RESULT_CANCELED){
+			finish();
+		}
+		super.onActivityResult(requestCode, resultCode, data);
+	}
+	
+	@Override
+	protected void onDestroy() {
+		Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
+		stopService(gattServiceIntent);
+		unbindService(mServiceConnection);
+		super.onDestroy();
+	}
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		
+		if(keyCode == KeyEvent.KEYCODE_BACK){
+			AlertDialog.Builder builder = new AlertDialog.Builder(TMP006Activity.this);
+			builder.setTitle("종료하시겠습니까?");
+			builder.setPositiveButton("종료", new DialogInterface.OnClickListener() {
+				
+				@Override
+				public void onClick(DialogInterface dialog, int which) {
+					System.exit(0);
+				}
+			});
+			builder.setNegativeButton("취소", new DialogInterface.OnClickListener() {
+				
+				@Override
+				public void onClick(DialogInterface dialog, int which) {
+					dialog.cancel();
+				}
+			});
+			
+			AlertDialog dialog = builder.create();
+			
+			dialog.show();
+			
+			return true;
+		}
+		return super.onKeyDown(keyCode, event);
+	}
 	
 	private void sendMessage(int message_type){
 		
